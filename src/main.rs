@@ -2,7 +2,7 @@ use std::str;
 
 // I am aware of the parse function in the standard lib, but I am not using it because
 // 1. learning, 2. fun and 3. it might not be completely compatible with JSON
-fn parse_number(mut iter: str::Chars) -> (f64, str::Chars) {
+fn parse_json_number(mut iter: str::Chars) -> (f64, str::Chars) {
     
     fn parse_u(mut iter: std::str::Chars) -> (u32, std::str::Chars) {
         let mut number: u32 = 0;
@@ -82,8 +82,43 @@ fn parse_number(mut iter: str::Chars) -> (f64, str::Chars) {
     return (number, iter);
 }
 
+fn parse_json_string(mut iter: str::Chars) -> (String, str::Chars) {
+    let start = iter.clone();
+    let mut text = String::new();
+    if let Some('"') = iter.next() {} else {
+        return (String::from(""), start);
+    }
+    loop {
+        match iter.next() {
+            None => break,
+            Some('"') => break,
+            Some('\\') => {
+                let c = match iter.next() {
+                    Some('"') => '"',
+                    Some('\\') => '\\',
+                    Some('/') => '/',
+                    Some('b') => '\x08',
+                    Some('f') => '\x0C',
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some(_) => '?',
+                    None => break,
+                };
+                text.push(c);
+            }
+            Some(c) => text.push(c),
+        }
+    }
+    return (text, iter);
+}
+
 fn main() {
-    let json_text = "9.25e-2abc";
-    let (num, mut next) = parse_number(json_text.chars());
-    println!("number: {}, next: {}", num, if let Some(c) = next.next() { c } else { '!' });
+    //let json_text = "9.25e-2abc";
+    //let (num, mut next) = parse_json_number(json_text.chars());
+    //println!("number: {}, next: {}", num, if let Some(c) = next.next() { c } else { '$' });
+    
+    let json_text = "\"test\\n\\\"string\"a";
+    let (text, mut next) = parse_json_string(json_text.chars());
+    println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
 }
