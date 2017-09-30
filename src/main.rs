@@ -1,3 +1,4 @@
+use std::str;
 
 fn parse_u(mut iter: std::str::Chars) -> (u32, std::str::Chars) {
     let mut number: u32 = 0;
@@ -17,16 +18,23 @@ fn parse_u(mut iter: std::str::Chars) -> (u32, std::str::Chars) {
     return (number, iter);
 }
 
-/*
 fn parse_i(mut iter: std::str::Chars) -> (i32, std::str::Chars) {
-    let next = iter.clone();
+    let mut next = iter.clone();
+    let mut negative = false;
     if let Some(c) = next.next() {
-        
+        if c == '-' {
+            negative = true;
+            iter = next;
+        } else if c == '+' {
+            iter = next;
+        }
+        let u_part = parse_u(iter);
+        let number = (u_part.0 as i32) * (if negative { -1 } else { 1 });
+        return (number, u_part.1);
     } else {
         return (0, iter);
     }
 }
-*/
 
 /*
 fn parse_f(mut iter: std::str::Chars) -> (f64, std::str::Chars) {
@@ -56,11 +64,11 @@ fn parse_f(mut iter: std::str::Chars) -> (f64, std::str::Chars) {
 */
 
 fn main() {
-    let json_text = "7788afdai";
+    let json_text = "1788afdai";
     
     //let iter = json_text.chars();
     //parse_num(iter);
-    println!("number: {}", parse_u(json_text.chars()).0);
+    println!("number: {}", parse_i(json_text.chars()).0);
     /*
     while let c: char = iter.next()
     {
