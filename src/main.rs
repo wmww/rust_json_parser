@@ -1,105 +1,89 @@
 use std::str;
 
-fn parse_u(mut iter: std::str::Chars) -> (u32, std::str::Chars) {
-    let mut number: u32 = 0;
-    loop {
-        let mut next = iter.clone();
-        if let Some(c) = next.next() {
-            if let Some(digit) = c.to_digit(10) {
-                number = number * 10 + digit;
+// I am aware of the parse function in the standard lib, but I am not using it because
+// 1. learning, 2. fun and 3. it might not be completely compatible with JSON
+fn parse_number(mut iter: str::Chars) -> (f64, str::Chars) {
+    
+    fn parse_u(mut iter: std::str::Chars) -> (u32, std::str::Chars) {
+        let mut number: u32 = 0;
+        loop {
+            let mut next = iter.clone();
+            if let Some(c) = next.next() {
+                if let Some(digit) = c.to_digit(10) {
+                    number = number * 10 + digit;
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
-        } else {
-            break;
-        }
-        iter = next;
-    }
-    return (number, iter);
-}
-
-fn parse_i(mut iter: std::str::Chars) -> (i32, std::str::Chars) {
-    let mut next = iter.clone();
-    let mut negative = false;
-    if let Some(c) = next.next() {
-        if c == '-' {
-            negative = true;
-            iter = next;
-        } else if c == '+' {
             iter = next;
         }
-        let u_part = parse_u(iter);
-        let number = (u_part.0 as i32) * (if negative { -1 } else { 1 });
-        return (number, u_part.1);
-    } else {
-        return (0, iter);
+        return (number, iter);
     }
-}
 
-// parses a number assumed to be after the decimal point
-fn parse_decimal(mut iter: str::Chars) -> (f64, str::Chars) {
-    let mut number = 0.0;
-    let mut divider = 10.0;
-    loop {
+    // the bool slot is if it is negative
+    // (important because -0 is different from 0 if this is one component in parsing a decimal)
+    fn parse_i(mut iter: std::str::Chars) -> (i32, bool, std::str::Chars) {
         let mut next = iter.clone();
+        let mut negative = false;
         if let Some(c) = next.next() {
-            if let Some(digit) = c.to_digit(10) {
-                number += digit as f64 / divider;
-                divider *= 10.0;
+            if c == '-' {
+                negative = true;
+                iter = next;
+            } else if c == '+' {
+                iter = next;
+            }
+            let u_part = parse_u(iter);
+            return (u_part.0 as i32 * (if negative { -1 } else { 1 }), negative, u_part.1);
+        } else {
+            return (0, false, iter);
+        }
+    }
+
+    // parses a number assumed to be after the decimal point
+    fn parse_decimal(mut iter: str::Chars) -> (f64, str::Chars) {
+        let mut number = 0.0;
+        let mut divider = 10.0;
+        loop {
+            let mut next = iter.clone();
+            if let Some(c) = next.next() {
+                if let Some(digit) = c.to_digit(10) {
+                    number += digit as f64 / divider;
+                    divider *= 10.0;
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
-        } else {
-            break;
+            iter = next;
         }
-        iter = next;
+        return (number, iter);
     }
-    return (number, iter);
-}
-
-fn parse_f(mut iter: str::Chars) -> (f64, str::Chars) {
-    let mut next = iter.clone();
-    let mut negative = false;
+    
+    let (i_part, negative, mut next) = parse_i(iter);
+    iter = next.clone();
+    let mut number = i_part as f64;
     if let Some(c) = next.next() {
-        if c == '-' {
-            negative = true;
-            iter = next;
-        } else if c == '+' {
-            iter = next;
-        }
-        let (u_part, mut next) = parse_u(iter);
-        iter = next.clone();
-        let mut number = u_part as f64;
-        if let Some(c) = next.next() {
-            if c == '.' {
-                let (decimal_part, mut next) = parse_decimal(next);
-                number += decimal_part;
-                iter = next.clone();
-                if let Some(c) = next.next() {
-                    if c == 'e' || c == 'E' {
-                        let (e, next) = parse_i(next);
-                        number *= 10f64.powi(e) as f64;
-                        iter = next;
-                    }
+        if c == '.' {
+            let (decimal_part, mut next) = parse_decimal(next);
+            number += decimal_part * (if negative { -1.0 } else { 1.0 });
+            iter = next.clone();
+            if let Some(c) = next.next() {
+                if c == 'e' || c == 'E' {
+                    let (e, _, next) = parse_i(next);
+                    number *= 10f64.powi(e) as f64;
+                    iter = next;
                 }
             }
         }
-        return (number * (if negative { -1.0 } else { 1.0 }), iter);
-    } else {
-        return (0.0, iter);
     }
+    return (number, iter);
 }
 
 fn main() {
-    let json_text = "-34.889e-2";
-    
-    //let iter = json_text.chars();
-    //parse_num(iter);
-    println!("number: {}", parse_f(json_text.chars()).0);
-    /*
-    while let c: char = iter.next()
-    {
-        println!("{}", c.unwrap());
-    }
-    */
+    let json_text = "9.25e-2abc";
+    let (num, mut next) = parse_number(json_text.chars());
+    println!("number: {}, next: {}", num, if let Some(c) = next.next() { c } else { '!' });
 }
