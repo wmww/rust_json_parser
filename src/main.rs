@@ -45,7 +45,7 @@ fn parse_decimal(mut iter: str::Chars) -> (f64, str::Chars) {
         if let Some(c) = next.next() {
             if let Some(digit) = c.to_digit(10) {
                 number += digit as f64 / divider;
-                divider *= 100.0;
+                divider *= 10.0;
             } else {
                 break;
             }
@@ -58,55 +58,40 @@ fn parse_decimal(mut iter: str::Chars) -> (f64, str::Chars) {
 }
 
 fn parse_f(mut iter: str::Chars) -> (f64, str::Chars) {
-    let (int_part, mut next) = parse_i(iter);
-    let mut number = int_part as f64;
-    iter = next.clone();
+    let mut next = iter.clone();
+    let mut negative = false;
     if let Some(c) = next.next() {
-        if c == '.' {
-            let (decimal_part, mut next) = parse_decimal(next);
-            number += decimal_part;
-            iter = next.clone();
-            if let Some(c) = next.next() {
-                if c == 'e' || c == 'E' {
-                    let (e, next) = parse_i(next);
-                    number *= 10f64.powi(e) as f64;
-                    iter = next;
+        if c == '-' {
+            negative = true;
+            iter = next;
+        } else if c == '+' {
+            iter = next;
+        }
+        let (u_part, mut next) = parse_u(iter);
+        iter = next.clone();
+        let mut number = u_part as f64;
+        if let Some(c) = next.next() {
+            if c == '.' {
+                let (decimal_part, mut next) = parse_decimal(next);
+                number += decimal_part;
+                iter = next.clone();
+                if let Some(c) = next.next() {
+                    if c == 'e' || c == 'E' {
+                        let (e, next) = parse_i(next);
+                        number *= 10f64.powi(e) as f64;
+                        iter = next;
+                    }
                 }
             }
         }
+        return (number * (if negative { -1.0 } else { 1.0 }), iter);
+    } else {
+        return (0.0, iter);
     }
-    return (number, iter);
 }
-
-/*
-fn parse_f(mut iter: std::str::Chars) -> (f64, std::str::Chars) {
-    let mut number: f64 = 0.0; // the accumulated output number
-    let mut decimal_pos = 0; // places we are to the right of the decimal, zero if we are to the left
-    let mut is_start = true; // if this is the first iteration
-    let mut is_valid = false; // if the number is currently in a valid state
-    let mut negative = false; // if the output number is negative
-    loop {
-        let next = iter.clone
-        if let Some(c) = next.next() {
-            if c == '-' {
-                if is_start {
-                    negative = true;
-                } else {
-                    break;
-                }
-            } else if 
-        } else {
-            break;
-        }
-        is_start = false;
-        iter = next;
-    }
-    return (number, iter);
-}
-*/
 
 fn main() {
-    let json_text = "-234.92";
+    let json_text = "-34.889e-2";
     
     //let iter = json_text.chars();
     //parse_num(iter);
