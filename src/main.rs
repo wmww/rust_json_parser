@@ -36,6 +36,48 @@ fn parse_i(mut iter: std::str::Chars) -> (i32, std::str::Chars) {
     }
 }
 
+// parses a number assumed to be after the decimal point
+fn parse_decimal(mut iter: str::Chars) -> (f64, str::Chars) {
+    let mut number = 0.0;
+    let mut divider = 10.0;
+    loop {
+        let mut next = iter.clone();
+        if let Some(c) = next.next() {
+            if let Some(digit) = c.to_digit(10) {
+                number += digit as f64 / divider;
+                divider *= 100.0;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+        iter = next;
+    }
+    return (number, iter);
+}
+
+fn parse_f(mut iter: str::Chars) -> (f64, str::Chars) {
+    let (int_part, mut next) = parse_i(iter);
+    let mut number = int_part as f64;
+    iter = next.clone();
+    if let Some(c) = next.next() {
+        if c == '.' {
+            let (decimal_part, mut next) = parse_decimal(next);
+            number += decimal_part;
+            iter = next.clone();
+            if let Some(c) = next.next() {
+                if c == 'e' || c == 'E' {
+                    let (e, next) = parse_i(next);
+                    number *= 10f64.powi(e) as f64;
+                    iter = next;
+                }
+            }
+        }
+    }
+    return (number, iter);
+}
+
 /*
 fn parse_f(mut iter: std::str::Chars) -> (f64, std::str::Chars) {
     let mut number: f64 = 0.0; // the accumulated output number
@@ -64,11 +106,11 @@ fn parse_f(mut iter: std::str::Chars) -> (f64, std::str::Chars) {
 */
 
 fn main() {
-    let json_text = "1788afdai";
+    let json_text = "-234.92";
     
     //let iter = json_text.chars();
     //parse_num(iter);
-    println!("number: {}", parse_i(json_text.chars()).0);
+    println!("number: {}", parse_f(json_text.chars()).0);
     /*
     while let c: char = iter.next()
     {
