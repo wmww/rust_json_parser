@@ -1,5 +1,23 @@
 use std::str;
 
+enum JsonValue {
+    Number(f64),
+    String(String),
+    Bool(bool),
+    Null,
+}
+
+impl JsonValue {
+    fn get_string(self) -> String {
+        match self {
+            JsonValue::Number(n) => n.to_string(),
+            JsonValue::String(s) => format!("\"{}\"", s),
+            JsonValue::Bool(b) => String::from(if b { "true" } else { "false" }),
+            JsonValue::Null => String::from("null"),
+        }
+    }
+}
+
 // I am aware of the parse function in the standard lib, but I am not using it because
 // 1. learning, 2. fun and 3. it might not be completely compatible with JSON
 fn parse_json_number(mut iter: str::Chars) -> (f64, str::Chars) {
@@ -113,12 +131,61 @@ fn parse_json_string(mut iter: str::Chars) -> (String, str::Chars) {
     return (text, iter);
 }
 
+fn skip_whitespace(mut iter: str::Chars) -> str::Chars {
+    loop {
+        let prev = iter.clone();
+        match iter.next() {
+            Some(' ') | Some('\t') | Some('\n') => continue,
+            Some(_) | None => return prev,
+        }
+    }
+}
+
+fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
+    iter = skip_whitespace(iter);
+    let prev = iter.clone();
+    match iter.next() {
+        Some('{') => {
+            return (JsonValue::Null, iter);
+        },
+        Some('[') => {
+            return (JsonValue::Null, iter);
+        },
+        Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
+            let data = parse_json_number(prev);
+            return (JsonValue::Number(data.0), data.1);
+        },
+        Some('"') => {
+            let data = parse_json_string(prev);
+            return (JsonValue::String(data.0), data.1);
+        },
+        Some('t') => {
+            return (JsonValue::Null, iter);
+        },
+        Some('f') => {
+            return (JsonValue::Null, iter);
+        },
+        Some('n') => {
+            return (JsonValue::Null, iter);
+        },
+        Some(_) | None => {
+            println!("bad token");
+            return (JsonValue::Null, iter);
+        }
+    }
+}
+
 fn main() {
     //let json_text = "9.25e-2abc";
     //let (num, mut next) = parse_json_number(json_text.chars());
     //println!("number: {}, next: {}", num, if let Some(c) = next.next() { c } else { '$' });
     
-    let json_text = "\"test\\n\\\"string\"a";
-    let (text, mut next) = parse_json_string(json_text.chars());
-    println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
+    //let json_text = "\"test\\n\\\"string\"a";
+    //let (text, mut next) = parse_json_string(json_text.chars());
+    //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
+    
+    //let json_text = "\"test\\n\\\"string\"a";
+    let json_text = "-57.9";
+    let (value, mut next) = parse_json_value(json_text.chars());
+    println!("value: {}, next: {}", value.get_string(), if let Some(c) = next.next() { c } else { '$' });
 }
