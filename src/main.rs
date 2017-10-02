@@ -248,6 +248,46 @@ fn parse_json_array(mut iter: str::Chars) -> (Option<Vec<JsonValue>>, str::Chars
     }
 }
 
+fn parse_json_object(mut iter: str::Chars) -> (HashMap<String, JsonValue>, str::Chars) {
+    let (start_token, mut iter) = next_token(iter);
+    let mut data = HashMap::<String, JsonValue>::new();
+    match start_token {
+        JsonToken::ObjectOpen => (),
+        _ => {
+            data.insert("INVALID MAP".to_string(), JsonValue::Invalid("bad map start character".to_string()));
+            return (data, iter);
+        },
+    }
+    loop {
+        let (token, next) = next_token(iter.clone());
+        match token {
+            JsonToken::ObjectClose => { return (data, next); },
+            JsonToken::Comma if !data.is_empty() => { iter = next.clone(); },
+            JsonToken::End => {
+                data.insert(token.to_string(), JsonValue::Invalid(token.to_string()));
+                return (data, next);
+            }
+            _ if !data.is_empty() => { data.insert(token.to_string(), JsonValue::Invalid(token.to_string())); },
+            _ => (),
+        }
+        let (key, next) = parse_json_value(next);
+        let (comma, next) = next_token(next);
+        match comma {
+            JsonToken::Comma => (),
+            _ => {
+                data.insert("INVALID".to_string(), JsonValue::Invalid(token.to_string()));
+                continue;
+            }
+        }
+        let (value, next) = parse_json_value(next);
+        match key {
+            JsonValue::String(s) => { data.insert(s, value); },
+            _ => { data.insert(key.to_string(), JsonValue::Invalid(key.to_string())); },
+        }
+        iter = next;
+    }
+}
+
 fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
     let (token, mut next) = next_token(iter.clone());
     match token {
@@ -260,8 +300,11 @@ fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
                 }
             , iter);
         },
+        JsonToken::ObjectOpen => {
+            let (data, iter) = parse_json_object(iter);
+            return (JsonValue::Object(data), iter);
+        }
         JsonToken::ArrayClose
-            | JsonToken::ObjectOpen
             | JsonToken::ObjectOpen
             | JsonToken::ObjectClose
             | JsonToken::Colon
