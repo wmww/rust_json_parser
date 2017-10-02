@@ -46,8 +46,8 @@ enum JsonValue {
 impl JsonValue {
     fn to_string(&self) -> String {
         match self {
-            &JsonValue::Object(ref o) => format!("(...)"),
-            &JsonValue::Array(ref v) => format!("{}{}{}", "[", v.iter().fold(String::new(), |sum, x| format!("{}{}{}", sum, if sum == String::from("") { "" } else { ", " }, x.to_string())), "]"),
+            &JsonValue::Object(ref o) => format!("{{{}}}", o.iter().fold(String::new(), |sum, x| format!("{}{}{}: {}", sum, if sum == String::from("") { "" } else { ", " }, x.0, x.1.to_string()))),
+            &JsonValue::Array(ref v) => format!("[{}]", v.iter().fold(String::new(), |sum, x| format!("{}{}{}", sum, if sum == String::from("") { "" } else { ", " }, x.to_string()))),
             &JsonValue::Number(ref n) => format!("{}", n.to_string()),
             &JsonValue::String(ref s) => format!("\"{}\"", s),
             &JsonValue::Bool(ref b) => format!("{}", if *b { "true" } else { "false" }),
@@ -273,12 +273,13 @@ fn parse_json_object(mut iter: str::Chars) -> (HashMap<String, JsonValue>, str::
             _ if !data.is_empty() => { data.insert(token.to_string(), JsonValue::Invalid(token.to_string())); },
             _ => (),
         }
-        let (key, next) = parse_json_value(next);
-        let (comma, next) = next_token(next);
-        match comma {
+        let (key, next) = parse_json_value(iter);
+        let (colon, next) = next_token(next);
+        match colon {
             JsonToken::Colon => (),
             _ => {
-                data.insert("INVALID".to_string(), JsonValue::Invalid(token.to_string()));
+                data.insert("INVALID".to_string(), JsonValue::Invalid(colon.to_string()));
+                iter = next;
                 continue;
             }
         }
@@ -333,7 +334,7 @@ fn main() {
     //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
     
     //let json_text = "\"test\\n\\\"string\"a";
-    let json_text = "[89.3, true, {}, [\"hey\", [79.3, null, -49.221e-2], false]]";
+    let json_text = "[89.3, true, {\"test\": true, \"2\"    :   49.3}, [\"hey\", [79.3, null, -49.221e-2], false]]";
     let (value, mut next) = parse_json_value(json_text.chars());
     println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
