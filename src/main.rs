@@ -9,13 +9,13 @@ enum JsonValue {
 }
 
 impl JsonValue {
-    fn to_string(self) -> String {
+    fn to_string(&self) -> String {
         match self {
-            JsonValue::Array(v) => String::from("[...]"),
-            JsonValue::Number(n) => n.to_string(),
-            JsonValue::String(s) => format!("\"{}\"", s),
-            JsonValue::Bool(b) => String::from(if b { "true" } else { "false" }),
-            JsonValue::Null => String::from("null"),
+            &JsonValue::Array(ref v) => format!("{}{}{}", "[", v.iter().fold(String::new(), |sum, x| format!("{}{}{}", sum, if sum == String::from("") { "" } else { ", " }, x.to_string())), "]"),
+            &JsonValue::Number(ref n) => n.to_string(),
+            &JsonValue::String(ref s) => format!("\"{}\"", s),
+            &JsonValue::Bool(ref b) => String::from(if *b { "true" } else { "false" }),
+            &JsonValue::Null => String::from("null"),
         }
     }
 }
@@ -143,16 +143,23 @@ fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
         return (Vec::new(), iter);
     }
     let mut data = Vec::<JsonValue>::new();
+    iter = skip_whitespace(iter);
+    let mut next = iter.clone();
+    if next.next() == Some(']') {
+        return return (data, next)
+    }
     loop {
         iter = skip_whitespace(iter);
-        let prev = iter.clone();
+        let (value, end_iter) = parse_json_value(iter);
+        data.push(value);
+        iter = end_iter;
         match iter.next() {
             Some(']') | None => return (data, iter),
-            _ => {
-                let (value, end_iter) = parse_json_value(prev);
-                data.push(value);
-                iter = end_iter;
-            }
+            Some(',') => {},
+            Some(c) => {
+                print_error("invalid token in array");
+                println!("{}", c);
+            },
         }
     }
 }
@@ -212,7 +219,7 @@ fn main() {
     //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
     
     //let json_text = "\"test\\n\\\"string\"a";
-    let json_text = "[-57.9, 4.3]";
+    let json_text = "[ 89.3, 54 ]";
     let (value, mut next) = parse_json_value(json_text.chars());
     println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
