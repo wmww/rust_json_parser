@@ -1,4 +1,5 @@
 use std::str;
+use std::collections::HashMap;
 
 enum JsonToken {
     ArrayOpen,
@@ -33,6 +34,7 @@ impl JsonToken {
 }
 
 enum JsonValue {
+    Object(HashMap<String, JsonValue>),
     Array(Vec<JsonValue>),
     Number(f64),
     String(String),
@@ -44,11 +46,12 @@ enum JsonValue {
 impl JsonValue {
     fn to_string(&self) -> String {
         match self {
-            &JsonValue::Array(ref v) => format!("{}{}{} (array)", "[", v.iter().fold(String::new(), |sum, x| format!("{}{}{}", sum, if sum == String::from("") { "" } else { ", " }, x.to_string())), "]"),
-            &JsonValue::Number(ref n) => format!("{} (number)", n.to_string()),
-            &JsonValue::String(ref s) => format!("\"{}\" (string)", s),
-            &JsonValue::Bool(ref b) => format!("{} (bool)", if *b { "true" } else { "false" }),
-            &JsonValue::Null => String::from("null (null)"),
+            &JsonValue::Object(ref o) => format!("(...)"),
+            &JsonValue::Array(ref v) => format!("{}{}{}", "[", v.iter().fold(String::new(), |sum, x| format!("{}{}{}", sum, if sum == String::from("") { "" } else { ", " }, x.to_string())), "]"),
+            &JsonValue::Number(ref n) => format!("{}", n.to_string()),
+            &JsonValue::String(ref s) => format!("\"{}\"", s),
+            &JsonValue::Bool(ref b) => format!("{}", if *b { "true" } else { "false" }),
+            &JsonValue::Null => String::from("null"),
             &JsonValue::Invalid(ref text) => format!("(INVALID VALUE '{}')", text),
         }
     }
@@ -289,7 +292,7 @@ fn main() {
     //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
     
     //let json_text = "\"test\\n\\\"string\"a";
-    let json_text = "[89.3, true]";
+    let json_text = "[89.3, true, {}, [\"hey\", [79.3, null, -49.221e-2], false]]";
     let (value, mut next) = parse_json_value(json_text.chars());
     println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
