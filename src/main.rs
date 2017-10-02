@@ -223,21 +223,24 @@ fn next_token(mut iter: str::Chars) -> (JsonToken, str::Chars) {
     }, iter)
 }
 
-fn parse_json_array(mut iter: str::Chars) -> (Option<Vec<JsonValue>>, str::Chars) {
+fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
     let (start_token, mut iter) = next_token(iter);
+    let mut data = Vec::<JsonValue>::new();
     match start_token {
         JsonToken::ArrayOpen => (),
-        _ => return (None, iter),
+        _ => {
+            data.push(JsonValue::Invalid("bad array start character".to_string()));
+            return (data, iter)
+        },
     }
-    let mut data = Vec::<JsonValue>::new();
     loop {
         let (token, next) = next_token(iter.clone());
         match token {
-            JsonToken::ArrayClose => return (Some(data), next),
+            JsonToken::ArrayClose => return (data, next),
             JsonToken::Comma if !data.is_empty() => { iter = next },
             JsonToken::End => {
                 data.push(JsonValue::Invalid(token.to_string()));
-                return (Some(data), next);
+                return (data, next);
             }
             _ if !data.is_empty() => data.push(JsonValue::Invalid(token.to_string())),
             _ => (),
@@ -273,7 +276,7 @@ fn parse_json_object(mut iter: str::Chars) -> (HashMap<String, JsonValue>, str::
         let (key, next) = parse_json_value(next);
         let (comma, next) = next_token(next);
         match comma {
-            JsonToken::Comma => (),
+            JsonToken::Colon => (),
             _ => {
                 data.insert("INVALID".to_string(), JsonValue::Invalid(token.to_string()));
                 continue;
@@ -293,12 +296,7 @@ fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
     match token {
         JsonToken::ArrayOpen => {
             let (data, iter) = parse_json_array(iter);
-            return (
-                match data{
-                    Some(data) => JsonValue::Array(data),
-                    None => JsonValue::Invalid("[array fuckup]".to_string()),
-                }
-            , iter);
+            return (JsonValue::Array(data), iter);
         },
         JsonToken::ObjectOpen => {
             let (data, iter) = parse_json_object(iter);
