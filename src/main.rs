@@ -1,6 +1,7 @@
 use std::str;
 
 enum JsonValue {
+    Array(Vec<JsonValue>),
     Number(f64),
     String(String),
     Bool(bool),
@@ -8,14 +9,19 @@ enum JsonValue {
 }
 
 impl JsonValue {
-    fn get_string(self) -> String {
+    fn to_string(self) -> String {
         match self {
+            JsonValue::Array(v) => String::from("[...]"),
             JsonValue::Number(n) => n.to_string(),
             JsonValue::String(s) => format!("\"{}\"", s),
             JsonValue::Bool(b) => String::from(if b { "true" } else { "false" }),
             JsonValue::Null => String::from("null"),
         }
     }
+}
+
+fn print_error(message: &str) {
+    println!("error: {}", message);
 }
 
 // I am aware of the parse function in the standard lib, but I am not using it because
@@ -131,6 +137,26 @@ fn parse_json_string(mut iter: str::Chars) -> (String, str::Chars) {
     return (text, iter);
 }
 
+fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
+    if iter.next() != Some('[') {
+        print_error("parse_json_array called on non array");
+        return (Vec::new(), iter);
+    }
+    let mut data = Vec::<JsonValue>::new();
+    loop {
+        iter = skip_whitespace(iter);
+        let prev = iter.clone();
+        match iter.next() {
+            Some(']') | None => return (data, iter),
+            _ => {
+                let (value, end_iter) = parse_json_value(prev);
+                data.push(value);
+                iter = end_iter;
+            }
+        }
+    }
+}
+
 fn skip_whitespace(mut iter: str::Chars) -> str::Chars {
     loop {
         let prev = iter.clone();
@@ -149,7 +175,8 @@ fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
             return (JsonValue::Null, iter);
         },
         Some('[') => {
-            return (JsonValue::Null, iter);
+            let data = parse_json_array(prev);
+            return (JsonValue::Array(data.0), data.1);
         },
         Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
             let data = parse_json_number(prev);
@@ -185,7 +212,7 @@ fn main() {
     //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
     
     //let json_text = "\"test\\n\\\"string\"a";
-    let json_text = "-57.9";
+    let json_text = "[-57.9, 4.3]";
     let (value, mut next) = parse_json_value(json_text.chars());
-    println!("value: {}, next: {}", value.get_string(), if let Some(c) = next.next() { c } else { '$' });
+    println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
