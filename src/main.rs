@@ -1,5 +1,17 @@
 use std::str;
 
+enum JsonToken {
+    ArrayOpen,
+    ArrayClose,
+    ObjectOpen,
+    ObjectClose,
+    Colon,
+    Number(f64),
+    String(String),
+    Identifier(String),
+    Invalid,
+}
+
 enum JsonValue {
     Array(Vec<JsonValue>),
     Number(f64),
@@ -137,6 +149,53 @@ fn parse_json_string(mut iter: str::Chars) -> (String, str::Chars) {
     return (text, iter);
 }
 
+fn skip_whitespace(mut iter: str::Chars) -> str::Chars {
+    loop {
+        let prev = iter.clone();
+        match iter.next() {
+            Some(' ') | Some('\t') | Some('\n') => continue,
+            Some(_) | None => return prev,
+        }
+    }
+}
+
+fn next_token(mut iter: str::Chars) -> (JsonToken, str::Chars) {
+    iter = skip_whitespace(iter);
+    let prev = iter.clone();
+    (match iter.next() {
+        Some('{') => JsonToken::ObjectOpen,
+        Some('}') => JsonToken::ObjectClose,
+        Some('[') => JsonToken::ArrayOpen,
+        Some(']') => JsonToken::ArrayClose,
+        Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
+            let data = parse_json_number(prev);
+            iter = data.1;
+            JsonToken::Number(data.0)
+        },
+        Some('"') => {
+            let data = parse_json_string(prev);
+            iter = data.1;
+            JsonToken::String(data.0)
+        },
+        Some(c) => {
+            let mut text = String::new();
+            text.push(c);
+            loop {
+                let prev = iter.clone();
+                let c = iter.next();
+                if c.is_none() || !c.unwrap().is_alphabetic() {
+                    iter = prev;
+                    break;
+                } else {
+                    text.push(c.unwrap());
+                }
+            }
+            JsonToken::String(text)
+        },
+        None => JsonToken::Invalid,
+    }, iter)
+}
+
 fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
     if iter.next() != Some('[') {
         print_error("parse_json_array called on non array");
@@ -160,16 +219,6 @@ fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
                 print_error("invalid token in array");
                 println!("{}", c);
             },
-        }
-    }
-}
-
-fn skip_whitespace(mut iter: str::Chars) -> str::Chars {
-    loop {
-        let prev = iter.clone();
-        match iter.next() {
-            Some(' ') | Some('\t') | Some('\n') => continue,
-            Some(_) | None => return prev,
         }
     }
 }
@@ -223,3 +272,4 @@ fn main() {
     let (value, mut next) = parse_json_value(json_text.chars());
     println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
+
