@@ -3,13 +3,33 @@ use std::str;
 enum JsonToken {
     ArrayOpen,
     ArrayClose,
+    Comma,
     ObjectOpen,
     ObjectClose,
     Colon,
     Number(f64),
     String(String),
     Identifier(String),
-    Invalid,
+    Invalid(String),
+    End,
+}
+
+impl JsonToken {
+    fn to_string(&self) -> String {
+        match self {
+            &JsonToken::ArrayOpen => "[".to_string(),
+            &JsonToken::ArrayClose => "]".to_string(),
+            &JsonToken::Comma => ",".to_string(),
+            &JsonToken::ObjectOpen => "{".to_string(),
+            &JsonToken::ObjectClose => "}".to_string(),
+            &JsonToken::Colon => ":".to_string(),
+            &JsonToken::Number(ref n) => n.to_string(),
+            &JsonToken::String(ref s) => format!("\"{}\"", s),
+            &JsonToken::Identifier(ref s) => s.to_string(),
+            &JsonToken::Invalid(ref text) => format!("<INVALID VALUE '{}'>", text),
+            &JsonToken::End => "<END>".to_string(),
+        }
+    }
 }
 
 enum JsonValue {
@@ -18,6 +38,7 @@ enum JsonValue {
     String(String),
     Bool(bool),
     Null,
+    Invalid(String),
 }
 
 impl JsonValue {
@@ -28,6 +49,7 @@ impl JsonValue {
             &JsonValue::String(ref s) => format!("\"{}\"", s),
             &JsonValue::Bool(ref b) => String::from(if *b { "true" } else { "false" }),
             &JsonValue::Null => String::from("null"),
+            &JsonValue::Invalid(ref text) => format!("<INVALID VALUE '{}'>", text),
         }
     }
 }
@@ -167,6 +189,8 @@ fn next_token(mut iter: str::Chars) -> (JsonToken, str::Chars) {
         Some('}') => JsonToken::ObjectClose,
         Some('[') => JsonToken::ArrayOpen,
         Some(']') => JsonToken::ArrayClose,
+        Some(',') => JsonToken::Comma,
+        Some(':') => JsonToken::Colon,
         Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
             let data = parse_json_number(prev);
             iter = data.1;
@@ -192,69 +216,65 @@ fn next_token(mut iter: str::Chars) -> (JsonToken, str::Chars) {
             }
             JsonToken::String(text)
         },
-        None => JsonToken::Invalid,
+        None => JsonToken::End,
     }, iter)
 }
 
-fn parse_json_array(mut iter: str::Chars) -> (Vec<JsonValue>, str::Chars) {
-    if iter.next() != Some('[') {
-        print_error("parse_json_array called on non array");
-        return (Vec::new(), iter);
+fn parse_json_array(mut iter: str::Chars) -> (Option<Vec<JsonValue>>, str::Chars) {
+    let (start_token, mut iter) = next_token(iter);
+    match start_token {
+        JsonToken::ArrayOpen => (),
+        _ => return (None, iter),
     }
     let mut data = Vec::<JsonValue>::new();
-    iter = skip_whitespace(iter);
-    let mut next = iter.clone();
-    if next.next() == Some(']') {
-        return return (data, next)
-    }
     loop {
-        iter = skip_whitespace(iter);
-        let (value, end_iter) = parse_json_value(iter);
-        data.push(value);
-        iter = end_iter;
-        match iter.next() {
-            Some(']') | None => return (data, iter),
-            Some(',') => {},
-            Some(c) => {
-                print_error("invalid token in array");
-                println!("{}", c);
-            },
+        let (token, next) = next_token(iter);
+        match token {
+            JsonToken::ArrayClose => return (Some(data), next),
+            JsonToken::Comma if !data.is_empty() => (),
+            JsonToken::End => {
+                data.push(JsonValue::Invalid(token.to_string()));
+                return (Some(data), next);
+            }
+            _ => data.push(JsonValue::Invalid(token.to_string())),
         }
+        let (value, next) = parse_json_value(next);
+        data.push(value);
+        iter = next;
     }
 }
 
 fn parse_json_value(mut iter: str::Chars) -> (JsonValue, str::Chars) {
-    iter = skip_whitespace(iter);
-    let prev = iter.clone();
-    match iter.next() {
-        Some('{') => {
-            return (JsonValue::Null, iter);
+    let (token, mut next) = next_token(iter.clone());
+    match token {
+        JsonToken::ArrayOpen => {
+            let (data, iter) = parse_json_array(iter);
+            return (
+                match data{
+                    Some(data) => JsonValue::Array(data),
+                    None => JsonValue::Invalid("[array fuckup]".to_string()),
+                }
+            , iter);
         },
-        Some('[') => {
-            let data = parse_json_array(prev);
-            return (JsonValue::Array(data.0), data.1);
+        JsonToken::ArrayClose
+            | JsonToken::ObjectOpen
+            | JsonToken::ObjectOpen
+            | JsonToken::ObjectClose
+            | JsonToken::Colon
+            | JsonToken::Comma
+            | JsonToken::End
+            => return (JsonValue::Invalid(token.to_string()), next),
+        JsonToken::Number(n) => return (JsonValue::Number(n), next),
+        JsonToken::String(s) => return (JsonValue::String(s), next),
+        JsonToken::Identifier(id) => {
+            match id.as_ref() {
+                "true" => return (JsonValue::Bool(true), next),
+                "false" => return (JsonValue::Bool(false), next),
+                "null" => return (JsonValue::Null, next),
+                text => return (JsonValue::Invalid(text.to_string()), next),
+            }
         },
-        Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
-            let data = parse_json_number(prev);
-            return (JsonValue::Number(data.0), data.1);
-        },
-        Some('"') => {
-            let data = parse_json_string(prev);
-            return (JsonValue::String(data.0), data.1);
-        },
-        Some('t') => {
-            return (JsonValue::Null, iter);
-        },
-        Some('f') => {
-            return (JsonValue::Null, iter);
-        },
-        Some('n') => {
-            return (JsonValue::Null, iter);
-        },
-        Some(_) | None => {
-            println!("bad token");
-            return (JsonValue::Null, iter);
-        }
+        JsonToken::Invalid(text) => (JsonValue::Invalid(text), next),
     }
 }
 
@@ -268,7 +288,7 @@ fn main() {
     //println!("text: '{}', next: {}", text, if let Some(c) = next.next() { c } else { '$' });
     
     //let json_text = "\"test\\n\\\"string\"a";
-    let json_text = "[ 89.3, 54 ]";
+    let json_text = "[89.3]";
     let (value, mut next) = parse_json_value(json_text.chars());
     println!("value: {}, next: {}", value.to_string(), if let Some(c) = next.next() { c } else { '$' });
 }
